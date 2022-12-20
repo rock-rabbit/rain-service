@@ -1,38 +1,66 @@
 package main
 
 import (
+	"errors"
 	"sync"
+	"time"
 )
 
+// Service rpc 服务
 type Service struct {
-	Rows map[string]*Row
+	Rows []*Row
 	mux  sync.Mutex
 }
 
-const (
-	// 运行中
-	STATUS_RUNNING = "running"
-	// 暂停
-	STATUS_PAUSE = "pause"
-	// 完成
-	STATUS_FINISH = "finish"
-	// 错误
-	STATUS_ERROR = "error"
-	// 回收站
-	STATUS_COVERY = "covery"
-)
-
-func NewService() *Service {
+func NewService(rows []*Row) *Service {
 	return &Service{
-		Rows: make(map[string]*Row),
+		Rows: rows,
 		mux:  sync.Mutex{},
 	}
 }
 
-func (s *Service) GetRows(args *struct{ Status string }, reply *[]*Row) error {
-	statusVal := args.Status
+func (s *Service) getRow(uuid string) *Row {
 	for _, v := range s.Rows {
-		if statusVal != "" && statusVal != v.Status {
+		if v.UUID == uuid {
+			return v
+		}
+	}
+	return nil
+}
+
+// Pause 暂停下载
+func (s *Service) Pause(uuid *string, reply **Row) error {
+	val := s.getRow(*uuid)
+	if val == nil {
+		return errors.New("uuid not find")
+	}
+	err := val.Pause()
+	if err != nil {
+		return err
+	}
+	*reply = val
+	return nil
+}
+
+// Start 开始下载
+func (s *Service) Start(uuid *string, reply **Row) error {
+	val := s.getRow(*uuid)
+	if val == nil {
+		return errors.New("uuid not find")
+	}
+	err := val.Start()
+	if err != nil {
+		return err
+	}
+	*reply = val
+	return nil
+}
+
+// GetRows 获取下载列表
+func (s *Service) GetRows(args *struct{ Status string }, reply *[]*Row) error {
+	statusVal := Status(args.Status)
+	for _, v := range s.Rows {
+		if statusVal != "" && !v.Status.Is(statusVal) {
 			continue
 		}
 		*reply = append(*reply, v)
@@ -40,27 +68,37 @@ func (s *Service) GetRows(args *struct{ Status string }, reply *[]*Row) error {
 	return nil
 }
 
+// AddUri 新增资源下载
 func (s *Service) AddUri(args *struct {
 	URI     string
 	Header  map[string]string
 	Outdir  string
 	Outname string
-}, reply *bool) error {
+}, reply **Row) error {
 	s.mux.Lock()
-	defer s.mux.Unlock()
 
 	uuid := NewUUID()
-	s.Rows[uuid] = &Row{
-		Status:   STATUS_RUNNING,
-		UUID:     uuid,
-		URI:      args.URI,
-		Progress: 0,
-		Outdir:   args.Outdir,
-		Outname:  args.Outname,
-		Header:   args.Header,
-	}
-	s.Rows[uuid].Start()
+	row := &Row{
+		UUID:   uuid,
+		Status: STATUS_PAUSE,
 
-	*reply = true
+		URI:     args.URI,
+		Outdir:  args.Outdir,
+		Outname: args.Outname,
+		Header:  args.Header,
+
+		CreateTime: time.Now(),
+		UpdateTime: time.Now(),
+	}
+	s.Rows = append(s.Rows, row)
+
+	s.mux.Unlock()
+
+	err := row.Start()
+	if err != nil {
+		return err
+	}
+
+	*reply = row
 	return nil
 }
