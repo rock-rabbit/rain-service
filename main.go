@@ -1,17 +1,19 @@
 package main
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
 // rain-service http 协议文件下载服务
 // 基于 json-rpc 1.0 协议
-
-var ()
 
 func main() {
 	var err error
@@ -44,14 +46,22 @@ func main() {
 		}
 	}()
 
-	// 程序退出监听
-
+	// 启动 http 服务
 	http.HandleFunc("/json", JsonRPC)
+	server := &http.Server{Addr: ":7362", Handler: nil}
+	go server.ListenAndServe()
 
-	err = http.ListenAndServe(":7362", nil)
-	if err != nil {
-		panic(err)
-	}
+	// 程序退出监听
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	// 退出服务
+	server.Shutdown(context.Background())
+	// 保存数据
+	sqliteCtl.Update(service.Rows)
+
+	os.Exit(0)
 }
 
 func JsonRPC(w http.ResponseWriter, req *http.Request) {
