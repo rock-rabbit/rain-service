@@ -18,6 +18,9 @@ Service.Start
 
 // 暂停下载
 Service.Pause
+
+// 删除
+Service.Delete
 ```
 
 ## 下载状态

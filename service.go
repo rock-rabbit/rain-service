@@ -28,6 +28,20 @@ func (s *Service) getRow(uuid string) *Row {
 	return nil
 }
 
+// Delete 删除下载
+func (s *Service) Delete(uuid *string, reply **Row) error {
+	val := s.getRow(*uuid)
+	if val == nil {
+		return errors.New("uuid not find")
+	}
+	err := val.Delete()
+	if err != nil {
+		return err
+	}
+	*reply = val
+	return nil
+}
+
 // Pause 暂停下载
 func (s *Service) Pause(uuid *string, reply **Row) error {
 	val := s.getRow(*uuid)
@@ -63,6 +77,11 @@ func (s *Service) GetRows(args *struct{ Status string }, reply *[]*Row) error {
 		if statusVal != "" && !v.Status.Is(statusVal) {
 			continue
 		}
+
+		if statusVal == "" && v.Status.Is(STATUS_COVERY) {
+			continue
+		}
+
 		*reply = append(*reply, v)
 	}
 	return nil

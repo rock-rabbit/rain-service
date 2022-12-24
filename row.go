@@ -93,6 +93,16 @@ func (r *Row) SetError(err error) {
 	r.Error = err.Error()
 }
 
+// Delete 删除下载
+func (r *Row) Delete() error {
+	if r.Status.Is(STATUS_RUNNING) {
+		return errors.New("cannot delete because the status is running")
+	}
+
+	r.SetStatus(STATUS_COVERY)
+	return nil
+}
+
 // Pause 暂停下载
 func (r *Row) Pause() error {
 	if !r.Status.Is(STATUS_RUNNING) {
